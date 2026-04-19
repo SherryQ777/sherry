@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>沙滩上的话</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #DBE7FF; }
+    canvas { display: block; }
+
+    /* ── 点击提示 ── */
+    #click-hint {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.85);
+      font-family: 'Georgia', serif;
+      font-size: 13px;
+      letter-spacing: 6px;
+      z-index: 5;
+      pointer-events: none;
+      white-space: nowrap;
+      animation: breathe 2.8s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.15; }
+      50%       { opacity: 0.9;  }
+    }
+
+    /* ── 输入界面 overlay ── */
+    #input-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(245, 243, 238, 0.97);
+      z-index: 20;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #input-overlay.show { display: flex; }
+
+    .io-title {
+      font-family: 'Georgia', serif;
+      font-size: 28px;
+      color: #3a3a3a;
+      letter-spacing: 7px;
+      margin-bottom: 10px;
+    }
+    .io-sub {
+      font-family: 'Georgia', serif;
+      font-size: 12px;
+      color: #bbb;
+      letter-spacing: 3px;
+      margin-bottom: 52px;
+    }
+    #user-input {
+      width: min(480px, 80vw);
+      padding: 10px 0;
+      font-family: 'Georgia', serif;
+      font-size: 22px;
+      color: #3a3a3a;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid #aaa;
+      outline: none;
+      text-align: center;
+      letter-spacing: 3px;
+    }
+    #user-input::placeholder { color: #d5d0c5; font-style: italic; }
+
+    #submit-btn {
+      margin-top: 46px;
+      padding: 14px 52px;
+      background: #0f1e8c;
+      color: rgba(255,255,255,0.92);
+      border: none;
+      font-family: 'Georgia', serif;
+      font-size: 14px;
+      letter-spacing: 5px;
+      cursor: pointer;
+      transition: background 0.25s, letter-spacing 0.25s;
+    }
+    #submit-btn:hover { background: #1929b5; letter-spacing: 6px; }
+
+    /* 背景音乐：不占版面，由脚本在用户首次交互后播放 */
+    #bg-music {
+      position: absolute;
+      width: 0;
+      height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* 沙滩结束后的底部选项：无额外背景，仅按钮 */
+    #post-beach-panel {
+      display: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 30;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      padding: 28px 24px 40px;
+      background: transparent;
+    }
+    #post-beach-panel.show { display: flex; }
+    #post-beach-panel button {
+      box-sizing: border-box;
+      min-width: 220px;
+      min-height: 48px;
+      padding: 12px 20px;
+      font-family: 'Georgia', 'Noto Serif SC', serif;
+      font-size: 14px;
+      letter-spacing: 4px;
+      text-align: center;
+      color: #fff;
+      background: transparent;
+      border: 1.5px solid #fff;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+    #post-beach-panel button:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* 冥想计时器 */
+    #meditate-timer {
+      display: none;
+      position: fixed;
+      top: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 35;
+      min-width: 240px;
+      padding: 18px 20px;
+      text-align: center;
+      color: #fff;
+      background: transparent;
+      pointer-events: auto;
+    }
+    #meditate-timer.show { display: block; }
+    #meditate-time {
+      font-family: 'Georgia', 'Noto Serif SC', serif;
+      font-size: 28px;
+      letter-spacing: 3px;
+      line-height: 1.1;
+    }
+    #meditate-summary {
+      min-height: 20px;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.82);
+      font-family: 'Georgia', 'Noto Serif SC', serif;
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+    #meditate-timer-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    #meditate-timer-actions button {
+      box-sizing: border-box;
+      min-width: 110px;
+      min-height: 42px;
+      padding: 10px 16px;
+      color: #fff;
+      background: transparent;
+      border: 1.5px solid #fff;
+      font-family: 'Georgia', 'Noto Serif SC', serif;
+      font-size: 13px;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    #meditate-timer-actions button:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    #meditate-stop-btn[disabled] {
+      opacity: 0.45;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+
+  <audio id="bg-music" src="sound.wav" loop playsinline preload="auto"></audio>
+
+  <div id="click-hint">点 击 任 意 处</div>
+
+  <div id="input-overlay">
+    <p class="io-title">写下今天的话</p>
+    <p class="io-sub">它将被刻在沙滩上，随海浪而去</p>
+    <input id="user-input" type="text" placeholder="…" maxlength="100"
+           autocomplete="off" spellcheck="false">
+    <button id="submit-btn">交 给 海 浪</button>
+  </div>
+
+  <div id="post-beach-panel" aria-hidden="true">
+    <button type="button" id="post-more-btn">还有想说的</button>
+    <button type="button" id="post-meditate-btn" title="敬请期待">去冥想</button>
+  </div>
+
+  <div id="meditate-timer" aria-hidden="true">
+    <div id="meditate-time">00:00</div>
+    <div id="meditate-summary"></div>
+    <div id="meditate-timer-actions">
+      <button type="button" id="meditate-start-btn">开始</button>
+      <button type="button" id="meditate-stop-btn" disabled>停止</button>
+    </div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  GLOBAL STATE
+// ═══════════════════════════════════════════════════════════════
+let scene       = 'intro';   // 'intro' | 'input' | 'beach' | 'meditate'
+let userText    = '';
+
+// sand-text erasing
+let sandAlpha   = 255;
+let sandTarget  = 255;
+let waveCovered = false;   // currently under water?
+let passCount   = 0;       // 0..3 wave passes
+let cooldown    = 0;       // frames before next pass can count
+let textGone    = false;
+let doneAlpha   = 0;
+/** 「已随浪而去」出现时刻，用于约 5 秒后显示底部选项 */
+let epilogueStartMs = 0;
+
+let bgMusicStarted = false;
+function ensureBgMusic() {
+  if (bgMusicStarted) return;
+  const el = document.getElementById('bg-music');
+  if (!el) return;
+  el.volume = 0.42;
+  el.loop = true;
+  const p = el.play();
+  if (p !== undefined && typeof p.catch === 'function') p.catch(() => {});
+  bgMusicStarted = true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SKETCH 1 — CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const INX  = 0.04;
+const INY  = 0.05;
+const DIST = 12;
+const WH   = 200;   // wavesHeight
+
+// ═══════════════════════════════════════════════════════════════
+//  SKETCH 2 — CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const SP    = 8;   // spacing
+
+/** 沙滩用户字与「已随浪而去」统一字号 */
+const SAND_LINE_TEXT_SIZE = 18;
+const POST_BEACH_DELAY_MS = 5000;
+
+/** 与沙滩场景 `fill(15, 30, 140)` 海浪同色 */
+const OCEAN_RGB = { r: 15, g: 30, b: 140 };
+/** 水母动画时间步长（越小整体越慢，原为 0.04） */
+const MEDITATE_TIME_STEP = 0.015;
+let jellyfishT = 0;
+let meditateTimerRunning = false;
+let meditateTimerStartMs = 0;
+let meditateTimerElapsedMs = 0;
+
+// ═══════════════════════════════════════════════════════════════
+//  P5 LIFECYCLE
+// ═══════════════════════════════════════════════════════════════
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+
+  document.getElementById('submit-btn')
+    .addEventListener('click', () => {
+      ensureBgMusic();
+      startBeach();
+    });
+  document.getElementById('user-input')
+    .addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        ensureBgMusic();
+        startBeach();
+      }
+    });
+
+  document.getElementById('post-more-btn')
+    .addEventListener('click', returnToMoreWords);
+  document.getElementById('post-meditate-btn')
+    .addEventListener('click', goMeditate);
+  document.getElementById('meditate-start-btn')
+    .addEventListener('click', startMeditateTimer);
+  document.getElementById('meditate-stop-btn')
+    .addEventListener('click', stopMeditateTimer);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+function keyPressed() {
+  if (scene === 'meditate' && keyCode === ESCAPE) {
+    hideMeditateTimerPanel();
+    scene = 'beach';
+    const postPanel = document.getElementById('post-beach-panel');
+    if (postPanel && textGone) {
+      postPanel.classList.add('show');
+      postPanel.setAttribute('aria-hidden', 'false');
+    }
+  }
+}
+
+// ─── click on canvas → show input overlay ──────────────────────
+function mousePressed() {
+  if (scene !== 'intro') return;
+  ensureBgMusic();
+  scene = 'input';
+  document.getElementById('click-hint').style.display = 'none';
+  document.getElementById('input-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('user-input').focus(), 80);
+}
+
+// ─── submit text → switch to beach scene ───────────────────────
+function startBeach() {
+  const val = document.getElementById('user-input').value.trim();
+  if (!val) return;
+
+  userText    = val;
+  sandAlpha   = 255;
+  sandTarget  = 255;
+  waveCovered = false;
+  passCount   = 0;
+  cooldown    = 0;
+  textGone    = false;
+  doneAlpha   = 0;
+  epilogueStartMs = 0;
+
+  const postPanel = document.getElementById('post-beach-panel');
+  if (postPanel) {
+    postPanel.classList.remove('show');
+    postPanel.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('input-overlay').classList.remove('show');
+  scene = 'beach';
+}
+
+function returnToMoreWords() {
+  const postPanel = document.getElementById('post-beach-panel');
+  if (postPanel) {
+    postPanel.classList.remove('show');
+    postPanel.setAttribute('aria-hidden', 'true');
+  }
+  epilogueStartMs = 0;
+  scene = 'input';
+  document.getElementById('input-overlay').classList.add('show');
+  const input = document.getElementById('user-input');
+  if (input) input.value = '';
+  setTimeout(() => document.getElementById('user-input').focus(), 80);
+}
+
+function goMeditate() {
+  const postPanel = document.getElementById('post-beach-panel');
+  if (postPanel) {
+    postPanel.classList.remove('show');
+    postPanel.setAttribute('aria-hidden', 'true');
+  }
+  jellyfishT = 0;
+  resetMeditateTimer();
+  showMeditateTimerPanel();
+  scene = 'meditate';
+}
+
+function formatMeditateDuration(ms) {
+  const totalSec = Math.max(0, floor(ms / 1000));
+  const minutes = floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function updateMeditateTimerUI() {
+  const timeEl = document.getElementById('meditate-time');
+  const summaryEl = document.getElementById('meditate-summary');
+  const startBtn = document.getElementById('meditate-start-btn');
+  const stopBtn = document.getElementById('meditate-stop-btn');
+  if (!timeEl || !summaryEl || !startBtn || !stopBtn) return;
+
+  const shownMs = meditateTimerRunning
+    ? meditateTimerElapsedMs + (Date.now() - meditateTimerStartMs)
+    : meditateTimerElapsedMs;
+
+  timeEl.textContent = formatMeditateDuration(shownMs);
+  summaryEl.textContent = meditateTimerRunning
+    ? '正在计时'
+    : meditateTimerElapsedMs > 0
+      ? `总时长 ${formatMeditateDuration(meditateTimerElapsedMs)}`
+      : '';
+  startBtn.disabled = meditateTimerRunning;
+  stopBtn.disabled = !meditateTimerRunning;
+}
+
+function resetMeditateTimer() {
+  meditateTimerRunning = false;
+  meditateTimerStartMs = 0;
+  meditateTimerElapsedMs = 0;
+  updateMeditateTimerUI();
+}
+
+function startMeditateTimer() {
+  if (meditateTimerRunning) return;
+  meditateTimerStartMs = Date.now();
+  meditateTimerRunning = true;
+  updateMeditateTimerUI();
+}
+
+function stopMeditateTimer() {
+  if (!meditateTimerRunning) return;
+  meditateTimerElapsedMs += Date.now() - meditateTimerStartMs;
+  meditateTimerStartMs = 0;
+  meditateTimerRunning = false;
+  updateMeditateTimerUI();
+}
+
+function showMeditateTimerPanel() {
+  const panel = document.getElementById('meditate-timer');
+  if (!panel) return;
+  panel.classList.add('show');
+  panel.setAttribute('aria-hidden', 'false');
+  updateMeditateTimerUI();
+}
+
+function hideMeditateTimerPanel() {
+  const panel = document.getElementById('meditate-timer');
+  if (!panel) return;
+  panel.classList.remove('show');
+  panel.setAttribute('aria-hidden', 'true');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE 3 ── 冥想 / 水母（背景与沙滩海浪同色 RGB 15,30,140）
+// ═══════════════════════════════════════════════════════════════
+function drawMeditate() {
+  colorMode(RGB, 255);
+  background(OCEAN_RGB.r, OCEAN_RGB.g, OCEAN_RGB.b);
+
+  push();
+  translate(width / 2, height / 3);
+  const jscale = min(width, height) / 550;
+  scale(jscale);
+
+  let hover = sin(jellyfishT) * 15;
+  translate(0, hover);
+
+  drawJellyTentacles();
+  drawJellyDome();
+  pop();
+
+  push();
+  colorMode(RGB, 255);
+  textAlign(CENTER, CENTER);
+  textFont('Georgia');
+  textSize(11);
+  fill(255, 255, 255, 100);
+  text('按 ESC 返回', width / 2, height - 28);
+  pop();
+
+  updateMeditateTimerUI();
+  jellyfishT += MEDITATE_TIME_STEP;
+}
+
+function drawJellyDome() {
+  push();
+  noStroke();
+  let pulse = sin(jellyfishT) * 0.1 + 0.9;
+  scale(pulse);
+  fill(255, 255, 255, 153);
+  beginShape();
+  for (let angle = 0; angle < TWO_PI; angle += 0.1) {
+    let r = 100;
+    let x = r * cos(angle);
+    let y = (r * 0.6) * sin(angle);
+    if (sin(angle) > 0) {
+      y += 10 * sin(angle * 10 + jellyfishT);
+    } else {
+      y *= 1.2;
+    }
+    vertex(x, y);
+  }
+  endShape(CLOSE);
+  pop();
+}
+
+function drawJellyTentacles() {
+  let numTentacles = 15;
+  for (let i = 0; i < numTentacles; i++) {
+    let baseAngle = map(i, 0, numTentacles, 0, TWO_PI);
+    let xBase = 80 * cos(baseAngle);
+    let yBase = 40 * sin(baseAngle);
+    push();
+    noFill();
+    stroke(255, 255, 255, 102);
+    strokeWeight(2);
+    beginShape();
+    curveVertex(xBase, yBase);
+    for (let j = 0; j < 1; j += 0.1) {
+      let xOff = sin(j * 5 + jellyfishT + i) * 40 * j;
+      let yOff = j * 250;
+      let x = xBase * (1 - j * 0.5) + xOff;
+      let y = yBase + yOff;
+      curveVertex(x, y);
+    }
+    curveVertex(xBase + sin(jellyfishT + i) * 50, yBase + 300);
+    endShape();
+    pop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN DRAW
+// ═══════════════════════════════════════════════════════════════
+function draw() {
+  if (scene === 'beach') drawBeach();
+  else if (scene === 'meditate') drawMeditate();
+  else drawIntro();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE 1 ── INTRO WAVES  (原 sketch 1，保持完全不变)
+// ═══════════════════════════════════════════════════════════════
+function drawIntro() {
+  colorMode(RGB, 255);
+  const zOff = frameCount * 0.01;
+  background('#DBE7FF');
+  strokeWeight(2);
+
+  let yOff = 0;
+  for (let y = -WH; y < height + WH; y += DIST) {
+    let xOff = 0;
+    let r    = xOff;   // mirrors original "float r = xOff"
+
+    stroke('#DBE7FF');
+    fill('#FFFFFF');
+    textFont('Georgia');
+    textAlign(LEFT, BASELINE);
+
+    textSize(25); text('All forms and appearances are but illusions.', 600, 100);
+    textSize(20); text('(凡有所相 皆是虚妄)', 650, 120);
+    textSize(25); text('All conditioned things are like a dream, a bubble, a shadow', 850, 300);
+    textSize(15); text('（一切有为法 如梦幻泡影）', 900, 320);
+    textSize(25); text('Leave your heart whispers upon the sand)', 350, 500);
+    textSize(15); text('（请把心事写在沙滩上）', 400, 520);
+    
+
+    beginShape();
+    for (let x = -WH; x < width * 1.5; x += DIST) {
+      const n     = noise(xOff, yOff, zOff);
+      const value = map(n, 0, 1, -WH, WH);
+      curveVertex(x, y + value);
+      xOff += INX;
+      r         = map(xOff, 100, 100, 0, 255);   // original expression preserved
+      const g   = map(n,    0.2, 40,  150, 240);
+      const b   = map(yOff, 178, 204, 252, 255);
+      fill(r, g, b, b * 1.5);
+    }
+    endShape();
+    yOff += INY;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE 2 ── BEACH  (原 sketch 2 + 沙滩刻字 + 海浪冲刷)
+// ═══════════════════════════════════════════════════════════════
+function drawBeachSandGradient() {
+  const ctx = drawingContext;
+  const g = ctx.createLinearGradient(0, 0, 0, height);
+  g.addColorStop(0, '#FFE2C0');
+  g.addColorStop(1, '#FFC5A1');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+function drawBeach() {
+  colorMode(RGB, 255);
+  drawBeachSandGradient();
+
+  const t         = frameCount * 0.01;
+  const tide      = sin(frameCount * 0.015);
+  const baseEdge  = height * 0.5 + tide * (height * 0.25);
+
+  // 沙滩字先画，在 ocean 之下 → 海浪自然盖住它
+  drawSandText(t, baseEdge);
+
+  // 深蓝色海洋 (原 sketch 2)，与冥想页背景同色
+  fill(OCEAN_RGB.r, OCEAN_RGB.g, OCEAN_RGB.b);
+  noStroke();
+  beginShape();
+  vertex(0, height);
+  for (let x = 0; x <= width; x += 15)
+    vertex(x, getWaveEdge(x, t, baseEdge));
+  vertex(width, height);
+  endShape(CLOSE);
+
+  // 浮动字符 (原 sketch 2)
+  push();
+  textFont('Courier New');
+  textSize(10);
+  textAlign(CENTER, CENTER);
+  drawFloatingText(t, baseEdge, tide);
+  pop();
+
+  // 浪花厚边 (原 sketch 2)
+  drawThickFoamEdge(t, baseEdge);
+  updatePostBeachPanelVisibility();
+}
+
+function updatePostBeachPanelVisibility() {
+  const panel = document.getElementById('post-beach-panel');
+  if (!panel || scene !== 'beach' || !textGone || epilogueStartMs <= 0) return;
+  if (millis() - epilogueStartMs >= POST_BEACH_DELAY_MS) {
+    panel.classList.add('show');
+    panel.setAttribute('aria-hidden', 'false');
+  }
+}
+
+// ─── 沙滩刻字：中文 → Noto Serif SC，其余 → Courier Prime ─────
+const SAND_FONT_CJK =
+  '"Noto Serif SC", "PingFang SC", "Source Han Serif SC", serif';
+const SAND_FONT_LATIN = '"Courier Prime", "Courier New", monospace';
+
+function isSandCJKChar(ch) {
+  return (
+    /\p{Unified_Ideograph}/u.test(ch) ||
+    /[\u3000-\u303f\uff00-\uffef]/.test(ch)
+  );
+}
+
+function splitSandTextForFonts(s) {
+  if (!s) return [];
+  const out = [];
+  let buf = '';
+  let cjk = null;
+  for (const ch of s) {
+    const c = isSandCJKChar(ch);
+    if (cjk === null) {
+      cjk = c;
+      buf = ch;
+      continue;
+    }
+    if (c === cjk) buf += ch;
+    else {
+      out.push({ text: buf, cjk });
+      buf = ch;
+      cjk = c;
+    }
+  }
+  if (buf) out.push({ text: buf, cjk });
+  return out;
+}
+
+/** 拆成可换行单元：中文逐字，西文按空格成词（连续空格保留为一个 token） */
+function tokenizeSandText(s) {
+  const chunks = splitSandTextForFonts(s);
+  const tokens = [];
+  for (const ch of chunks) {
+    if (ch.cjk) {
+      for (const c of ch.text) tokens.push({ text: c, cjk: true });
+    } else {
+      const t = ch.text;
+      let i = 0;
+      while (i < t.length) {
+        if (t[i] === ' ') {
+          let j = i;
+          while (j < t.length && t[j] === ' ') j++;
+          tokens.push({ text: t.slice(i, j), cjk: false });
+          i = j;
+        } else {
+          let j = i + 1;
+          while (j < t.length && t[j] !== ' ') j++;
+          tokens.push({ text: t.slice(i, j), cjk: false });
+          i = j;
+        }
+      }
+    }
+  }
+  return tokens;
+}
+
+function sandMeasureToken(tok, size) {
+  textSize(size);
+  textFont(tok.cjk ? SAND_FONT_CJK : SAND_FONT_LATIN);
+  return textWidth(tok.text);
+}
+
+function wrapSandTokens(tokens, maxW, size) {
+  const lines = [];
+  let line = [];
+  let lineW = 0;
+
+  function pushLine() {
+    if (line.length) lines.push(line);
+    line = [];
+    lineW = 0;
+  }
+
+  for (const tok of tokens) {
+    if (!tok.text) continue;
+    let w = sandMeasureToken(tok, size);
+
+    if (w > maxW && !tok.cjk && tok.text.length > 1) {
+      for (let k = 0; k < tok.text.length; k++) {
+        const one = { text: tok.text[k], cjk: false };
+        const cw = sandMeasureToken(one, size);
+        if (lineW + cw > maxW && line.length) pushLine();
+        if (line.length === 0 && one.text === ' ') continue;
+        line.push(one);
+        lineW += cw;
+      }
+      continue;
+    }
+
+    if (lineW + w > maxW && line.length) pushLine();
+    if (line.length === 0 && tok.text.trim() === '' && tok.text.length > 0) continue;
+    line.push(tok);
+    lineW += w;
+  }
+  pushLine();
+  return lines;
+}
+
+function getSandTextLayout(str, size) {
+  const maxW = min(width * 0.85, 680);
+  const tokens = tokenizeSandText(str);
+  const lines = wrapSandTokens(tokens, maxW, size);
+  const lineHeight = size * 1.28;
+  return { lines, lineHeight, maxW };
+}
+
+function drawSandTextBlock(str, cx, cy, size, alphaMain, layout) {
+  const { lines, lineHeight } = layout || getSandTextLayout(str, size);
+  if (!lines.length) return;
+
+  const totalH = lines.length * lineHeight;
+  let y = cy - totalH * 0.5 + lineHeight * 0.5;
+
+  textAlign(LEFT, CENTER);
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    let lineW = 0;
+    for (const tok of line) lineW += sandMeasureToken(tok, size);
+    let x = cx - lineW * 0.5;
+    for (const tok of line) {
+      textFont(tok.cjk ? SAND_FONT_CJK : SAND_FONT_LATIN);
+      fill(0, 0, 0, alphaMain);
+      text(tok.text, x, y);
+      x += sandMeasureToken(tok, size);
+    }
+    y += lineHeight;
+  }
+  textAlign(CENTER, CENTER);
+}
+
+// ─── 沙滩刻字 + 海浪冲刷逻辑 ─────────────────────────────────
+function drawSandText(t, baseEdge) {
+  const tx = width  * 0.5;
+  const ty = height * 0.38;   // 沙滩区域，靠近潮线
+  const sandSize = SAND_LINE_TEXT_SIZE;
+  const sandLayout = getSandTextLayout(userText || '', sandSize);
+  const sandBlockHalfH =
+    sandLayout.lines.length > 0
+      ? sandLayout.lines.length * sandLayout.lineHeight * 0.5
+      : sandSize * 0.5;
+
+  if (!textGone) {
+    // 冷却中则跳过计数，避免同一波浪重复计数
+    if (cooldown > 0) {
+      cooldown--;
+    } else {
+      const ey        = getWaveEdge(tx, t, baseEdge);
+      const nowUnder  = ey < ty + sandBlockHalfH + 24;   // 浪锋盖住整块文字区域
+
+      if (nowUnder && !waveCovered && passCount < 3) {
+        waveCovered = true;
+        passCount++;
+        sandTarget  = 255 * (1 - passCount / 3);   // 170 → 85 → 0
+        cooldown    = 100;  // ~1.7s，等浪退才能计下一次
+      }
+      if (!nowUnder) waveCovered = false;
+    }
+
+    sandAlpha = lerp(sandAlpha, sandTarget, 0.022);
+    if (sandAlpha < 2) {
+      sandAlpha = 0;
+      if (!textGone) epilogueStartMs = millis();
+      textGone = true;
+    }
+  }
+
+  // 绘制用户的刻字（中文 Noto Serif SC / 西文 Courier Prime + 黑色）
+  if (sandAlpha > 1) {
+    push();
+    noStroke();
+    textAlign(CENTER, CENTER);
+    drawSandTextBlock(userText, tx, ty, sandSize, sandAlpha, sandLayout);
+    pop();
+  }
+
+  // 文字消失后，「已随浪而去」缓缓浮现
+  if (textGone) {
+    doneAlpha = min(175, doneAlpha + 1.2);
+    push();
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textFont(SAND_FONT_CJK);
+    textSize(SAND_LINE_TEXT_SIZE);
+    fill(0, 0, 0, doneAlpha);
+    text('已随浪而去', tx, ty);
+    pop();
+  }
+}
+
+// ─── Sketch 2 原函数，逻辑完全不变 ───────────────────────────
+
+function getWaveEdge(x, t, baseY) {
+  let n = noise(x * 0.006, t) * 200 + noise(x * 0.02, t * 1.5) * 50;
+  return baseY + n - 60;
+}
+
+function drawFloatingText(t, baseY, tide) {
+  let tideOffset = tide * 40;
+  for (let x = -20; x < width + 20; x += SP) {
+    for (let y = -50; y < height + 100; y += SP) {
+
+      let driftX = (noise(x * 0.02, y * 0.02, t) - 0.5) * 25;
+      let driftY = (noise(x * 0.02 + 100, y * 0.02, t) - 0.5) * 25;
+
+      let finalX = x + driftX;
+      let finalY = y + tideOffset + driftY;
+      let edgeY  = getWaveEdge(finalX, t, baseY);
+
+      if (finalY <= edgeY) continue;
+
+      let distToEdge = finalY - edgeY;
+      let density    = noise(x * 0.008, y * 0.015, t * 0.5);
+      let threshold  = map(distToEdge, 0, 180, 0.15, 0.6);
+      if (distToEdge > 180) threshold = 0.6;
+      if (density <= threshold) continue;
+
+      let charIndex = floor(noise(x * 0.1, y * 0.1) * CHARS.length);
+      let ch        = CHARS.charAt(charIndex);
+
+      if (distToEdge < 60) {
+        fill(255, 255, 255, map(distToEdge, 0, 60, 255, 120));
+        push(); textSize(11); text(ch, finalX, finalY); pop();
+      } else {
+        let alpha = map(density, threshold, 1, 100, 220);
+        fill(180, 210, 255, alpha);
+        text(ch, finalX, finalY);
+      }
+    }
+  }
+}
+
+function drawThickFoamEdge(t, baseY) {
+  push();
+  noFill();
+  strokeWeight(3);
+  stroke(255, 255, 255, 220);
+  beginShape();
+  for (let x = 0; x <= width + 10; x += 10)
+    vertex(x, getWaveEdge(x, t, baseY));
+  endShape();
+
+  strokeWeight(1.5);
+  stroke(255, 255, 255, 120);
+  beginShape();
+  for (let x = 0; x <= width + 10; x += 10)
+    vertex(x, getWaveEdge(x, t, baseY) + 5);
+  endShape();
+  pop();
+}
+</script>
+</body>
+</html>
